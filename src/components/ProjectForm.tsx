@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Form,
@@ -91,19 +91,49 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   mode = 'create',
 }) => {
   const [form] = Form.useForm();
-  const [selectedExecutionTypes, setSelectedExecutionTypes] = useState<ExecutionType[]>(
-    initialData?.executionType || []
-  );
-  const [fileList, setFileList] = useState<UploadFile[]>(
-    (initialData?.files || []).map(f => ({
-      uid: f.uid,
-      name: f.name,
-      status: 'done' as const,
-      url: f.url,
-    }))
-  );
-  // 二级联动：选中的事业部
-  const [selectedBU, setSelectedBU] = useState<string>(initialData?.businessUnit || '');
+  const [selectedExecutionTypes, setSelectedExecutionTypes] = useState<ExecutionType[]>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [selectedBU, setSelectedBU] = useState<string>('');
+
+  // 每次弹窗打开时同步 initialData 到表单和本地状态
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        const executionTypes = initialData.executionType || [];
+        setSelectedExecutionTypes(executionTypes);
+        setSelectedBU(initialData.businessUnit || '');
+        setFileList(
+          (initialData.files || []).map(f => ({
+            uid: f.uid,
+            name: f.name,
+            status: 'done' as const,
+            url: f.url,
+          }))
+        );
+        form.setFieldsValue({
+          projectName: initialData.projectName,
+          salesRegion: initialData.salesRegion,
+          projectTime: initialData.projectTime ? dayjs(initialData.projectTime, 'YYYY') : undefined,
+          businessUnit: initialData.businessUnit,
+          category: initialData.category,
+          researchType: initialData.researchType,
+          projectBackground: initialData.projectBackground,
+          projectPurpose: initialData.projectPurpose,
+          mainConclusion: initialData.mainConclusion,
+          followUpDirection: initialData.followUpDirection,
+          // 执行类型子字段
+          ...(initialData.qualitativeFields || {}),
+          ...(initialData.bigDataFields || {}),
+        });
+      } else {
+        // 新增模式：清空所有
+        form.resetFields();
+        setSelectedExecutionTypes([]);
+        setSelectedBU('');
+        setFileList([]);
+      }
+    }
+  }, [open, initialData, form]);
 
   const hasQualitativeType = selectedExecutionTypes.some(t =>
     QUALITATIVE_TYPES.includes(t)

@@ -19,6 +19,7 @@ import {
   SearchOutlined,
   EyeOutlined,
   DeleteOutlined,
+  EditOutlined,
   PaperClipOutlined,
   DownloadOutlined,
   AppstoreOutlined,
@@ -169,6 +170,8 @@ const StatCard: React.FC<StatCardProps> = ({ label, count, icon, active, onClick
 const ProjectList: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -264,6 +267,37 @@ const ProjectList: React.FC = () => {
       updatedAt: new Date().toISOString(),
     };
     setProjects(prev => [newProject, ...prev]);
+  };
+
+  const handleUpdateProject = (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!editingProject) return;
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === editingProject.id
+          ? { ...p, ...data, updatedAt: new Date().toISOString() }
+          : p
+      )
+    );
+  };
+
+  const handleFormSubmit = (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (formMode === 'edit') {
+      handleUpdateProject(data);
+    } else {
+      handleAddProject(data);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setFormMode('create');
+    setEditingProject(null);
+    setFormOpen(true);
+  };
+
+  const handleOpenEdit = (project: Project) => {
+    setFormMode('edit');
+    setEditingProject(project);
+    setFormOpen(true);
   };
 
   const handleDeleteProject = (id: string) => {
@@ -438,11 +472,14 @@ const ProjectList: React.FC = () => {
       title: '操作',
       key: 'action',
       fixed: 'right',
-      width: 100,
+      width: 120,
       render: (_, record) => (
         <Space>
           <Tooltip title="查看详情">
             <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} style={{ color: '#1677ff' }} />
+          </Tooltip>
+          <Tooltip title="编辑">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenEdit(record)} style={{ color: '#52c41a' }} />
           </Tooltip>
           <Popconfirm
             title="确认删除"
@@ -497,7 +534,7 @@ const ProjectList: React.FC = () => {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setFormOpen(true)}
+              onClick={() => handleOpenCreate()}
               style={{
                 background: '#1677ff',
                 borderRadius: 8,
@@ -635,7 +672,7 @@ const ProjectList: React.FC = () => {
                   description={
                     <span>
                       暂无项目数据，
-                      <Button type="link" onClick={() => setFormOpen(true)} style={{ padding: 0 }}>
+                      <Button type="link" onClick={() => handleOpenCreate()} style={{ padding: 0 }}>
                         立即新增
                       </Button>
                     </span>
@@ -650,11 +687,16 @@ const ProjectList: React.FC = () => {
         </Card>
       </div>
 
-      {/* 新增弹窗 */}
+      {/* 新增/编辑弹窗 */}
       <ProjectForm
         open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSubmit={handleAddProject}
+        mode={formMode}
+        initialData={editingProject ?? undefined}
+        onClose={() => {
+          setFormOpen(false);
+          setEditingProject(null);
+        }}
+        onSubmit={handleFormSubmit}
       />
 
       {/* 详情弹窗 */}
