@@ -10,44 +10,135 @@ export type ResearchType =
   | '其他专题研究';
 
 // 内外销 - 国家/地区枚举
-export type SalesRegion =
-  | '中国大陆'
-  | '中国香港'
-  | '中国澳门'
-  | '中国台湾'
-  | '美国'
-  | '英国'
-  | '德国'
-  | '法国'
-  | '日本'
-  | '韩国'
-  | '澳大利亚'
-  | '加拿大'
-  | '巴西'
-  | '印度'
-  | '俄罗斯'
-  | '东南亚'
-  | '中东'
-  | '其他';
+export type SalesRegion = string;
 
-// 定性/定量/体验测评 详细字段
-export interface QualitativeQuantitativeFields {
-  executionMethod: string;       // 执行方法
-  sampleSize: string;            // 样本量
-  recruitmentConditions: string; // 招募条件简述
-  sampleDistribution: string;    // 样本分布（地理位置等）
-  rawRecordContent: string;      // 原始笔录内容
+// 大洲/地区分组树
+export interface RegionGroup {
+  key: string;
+  label: string;
+  countries: { label: string; value: string }[];
+}
+
+export const REGION_TREE: RegionGroup[] = [
+  {
+    key: 'asia_china',
+    label: '亚洲（中国大陆）',
+    countries: [
+      { label: '中国大陆', value: '中国大陆' },
+    ],
+  },
+  {
+    key: 'asia_non_china',
+    label: '亚洲（非中国大陆）',
+    countries: [
+      { label: '中国香港', value: '中国香港' },
+      { label: '中国澳门', value: '中国澳门' },
+      { label: '中国台湾', value: '中国台湾' },
+      { label: '日本', value: '日本' },
+      { label: '韩国', value: '韩国' },
+      { label: '泰国', value: '泰国' },
+      { label: '印度', value: '印度' },
+      { label: '越南', value: '越南' },
+      { label: '菲律宾', value: '菲律宾' },
+      { label: '印度尼西亚', value: '印度尼西亚' },
+      { label: '马来西亚', value: '马来西亚' },
+      { label: '新加坡', value: '新加坡' },
+      { label: '缅甸', value: '缅甸' },
+      { label: '柬埔寨', value: '柬埔寨' },
+      { label: '土库曼斯坦', value: '土库曼斯坦' },
+      { label: '格鲁吉亚', value: '格鲁吉亚' },
+      { label: '伊朗', value: '伊朗' },
+      { label: '东南亚其他', value: '东南亚其他' },
+    ],
+  },
+  {
+    key: 'europe',
+    label: '欧洲',
+    countries: [
+      { label: '英国', value: '英国' },
+      { label: '德国', value: '德国' },
+      { label: '法国', value: '法国' },
+      { label: '意大利', value: '意大利' },
+      { label: '西班牙', value: '西班牙' },
+      { label: '荷兰', value: '荷兰' },
+      { label: '比利时', value: '比利时' },
+      { label: '瑞典', value: '瑞典' },
+      { label: '挪威', value: '挪威' },
+      { label: '丹麦', value: '丹麦' },
+      { label: '俄罗斯', value: '俄罗斯' },
+      { label: '波兰', value: '波兰' },
+      { label: '捷克', value: '捷克' },
+      { label: '罗马尼亚', value: '罗马尼亚' },
+    ],
+  },
+  {
+    key: 'americas',
+    label: '美洲',
+    countries: [
+      { label: '美国', value: '美国' },
+      { label: '加拿大', value: '加拿大' },
+      { label: '墨西哥', value: '墨西哥' },
+      { label: '巴西', value: '巴西' },
+      { label: '阿根廷', value: '阿根廷' },
+      { label: '智利', value: '智利' },
+      { label: '哥伦比亚', value: '哥伦比亚' },
+    ],
+  },
+  {
+    key: 'africa',
+    label: '非洲',
+    countries: [
+      { label: '南非', value: '南非' },
+      { label: '尼日利亚', value: '尼日利亚' },
+      { label: '埃及', value: '埃及' },
+      { label: '肯尼亚', value: '肯尼亚' },
+      { label: '埃塞俄比亚', value: '埃塞俄比亚' },
+      { label: '非洲其他', value: '非洲其他' },
+    ],
+  },
+  {
+    key: 'oceania',
+    label: '大洋洲',
+    countries: [
+      { label: '澳大利亚', value: '澳大利亚' },
+      { label: '新西兰', value: '新西兰' },
+    ],
+  },
+  {
+    key: 'middle_east',
+    label: '中东',
+    countries: [
+      { label: '沙特阿拉伯', value: '沙特阿拉伯' },
+      { label: '阿联酋', value: '阿联酋' },
+      { label: '卡塔尔', value: '卡塔尔' },
+      { label: '科威特', value: '科威特' },
+      { label: '以色列', value: '以色列' },
+      { label: '土耳其', value: '土耳其' },
+      { label: '中东其他', value: '中东其他' },
+    ],
+  },
+];
+
+// 定性/定量/体验测评 详细字段（每种执行类型各自独立）
+export interface QualQtyFields {
+  executionMethod: string;        // 提炼总结执行方法
+  sampleSize: string;             // 样本量
+  targetAudience?: string;        // 目标人群（仅定性有）
+  targetAudienceFile?: ProjectFile; // 人群清单附件（仅定性有）
+  sampleDistribution: string;     // 样本分布（地理位置等）
+  recruitmentConditions: string;  // 招募条件简述
+  rawRecordContent: string;       // 原始笔录内容
 }
 
 // 大数据 详细字段
 export interface BigDataFields {
-  dataSource: string;            // 数据源
-  dataAcquisitionMethod: string; // 数据获取方式
-  dataRangeAndCleaning: string;  // 数据范围及清洗规则
-  dataVolume: string;            // 数据量
+  dataSource: string;
+  dataAcquisitionMethod: string;
+  dataRangeAndCleaning: string;
+  dataVolume: string;
 }
 
-// 上传文件
+// 上传文件（含执行类型归属）
 export interface ProjectFile {
   uid: string;
   name: string;
@@ -55,30 +146,41 @@ export interface ProjectFile {
   size?: number;
   type?: string;
   status?: 'uploading' | 'done' | 'error';
+  category?: string; // 归属：'定性'|'定量'|'体验测评'|'大数据'|'综合'
+}
+
+// AI 提炼字段模式
+export type AIFieldMode = 'ai' | 'manual';
+
+// AI 提炼字段（支持双模式）
+export interface AIField {
+  mode: AIFieldMode;   // 'ai' = 提交后AI提炼, 'manual' = 用户自己输入
+  value: string;
 }
 
 // 项目数据模型
 export interface Project {
   id: string;
-  projectName: string;              // 项目名称
-  salesRegion: SalesRegion[];       // 内外销（国家/地区，可多选）
-  projectTime: string;              // 项目时间（年份）
-  businessUnit: string;             // 所属事业部
-  category: string;                 // 所属品类
-  executionType: ExecutionType[];   // 项目执行类型（可多选）
-  researchType: ResearchType;       // 项目研究类型
+  projectNo: string;              // 项目编号（系统自动生成）
+  projectName: string;            // 项目名称
+  salesRegion: SalesRegion[];     // 内外销（国家/地区，多选）
+  projectTime: string;            // 项目时间（年份）
+  businessUnit: string;           // 所属事业部
+  category: string[];             // 所属品类（多选）
+  brand: string[];                // 品牌（多选，选填）
+  researchType: ResearchType;     // 研究类型（必填）
+  projectType?: string[];         // 项目类型（选填，多选）
+  executionType: ExecutionType[]; // 项目执行类型（多选）
 
-  // 执行类型详细字段 - 定性/定量/体验测评（多个执行类型共用）
-  qualitativeFields?: QualitativeQuantitativeFields;
-
-  // 执行类型详细字段 - 大数据
+  // 执行类型详细字段（每个执行类型独立一份，key为执行类型名）
+  qualFields?: Partial<Record<'定性' | '定量', QualQtyFields>>;
   bigDataFields?: BigDataFields;
 
-  // 项目背景信息（列表展示字段）
-  projectBackground: string;        // 项目背景
-  projectPurpose: string;           // 项目目的
-  mainConclusion: string;           // 主要结论/价值提炼
-  followUpDirection: string;        // 该项目后续工作方向总结
+  // 项目背景信息（支持AI提炼）
+  projectBackground: AIField;
+  projectPurpose: AIField;
+  mainConclusion: AIField;
+  followUpDirection: AIField;
 
   // 上传文件
   files: ProjectFile[];
@@ -89,8 +191,7 @@ export interface Project {
   createdBy?: string;
 }
 
-// 表单数据类型（新增时使用）
-export type ProjectFormData = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
+// ─── 静态选项数据 ────────────────────────────────────────────────────
 
 // 事业部 + 品类 二级联动
 export const BUSINESS_UNIT_CATEGORY_MAP: Record<string, string[]> = {
@@ -105,37 +206,29 @@ export const BUSINESS_UNIT_CATEGORY_MAP: Record<string, string[]> = {
 
 export const BUSINESS_UNIT_OPTIONS = Object.keys(BUSINESS_UNIT_CATEGORY_MAP);
 
-// 所属品类选项（兼容旧代码，展平所有品类）
-export const CATEGORY_OPTIONS = Object.values(BUSINESS_UNIT_CATEGORY_MAP).flat();
-
-// 国家/地区选项（带分组）
-export const SALES_REGION_OPTIONS: { label: string; value: SalesRegion; group: string }[] = [
-  { label: '中国大陆', value: '中国大陆', group: '中国' },
-  { label: '中国香港', value: '中国香港', group: '中国' },
-  { label: '中国澳门', value: '中国澳门', group: '中国' },
-  { label: '中国台湾', value: '中国台湾', group: '中国' },
-  { label: '美国', value: '美国', group: '北美洲' },
-  { label: '加拿大', value: '加拿大', group: '北美洲' },
-  { label: '英国', value: '英国', group: '欧洲' },
-  { label: '德国', value: '德国', group: '欧洲' },
-  { label: '法国', value: '法国', group: '欧洲' },
-  { label: '俄罗斯', value: '俄罗斯', group: '欧洲' },
-  { label: '日本', value: '日本', group: '亚太' },
-  { label: '韩国', value: '韩国', group: '亚太' },
-  { label: '澳大利亚', value: '澳大利亚', group: '亚太' },
-  { label: '东南亚', value: '东南亚', group: '亚太' },
-  { label: '印度', value: '印度', group: '南亚' },
-  { label: '巴西', value: '巴西', group: '南美洲' },
-  { label: '中东', value: '中东', group: '中东' },
-  { label: '其他', value: '其他', group: '其他' },
+// 品牌选项（与GVOC本品品牌保持一致）
+export const BRAND_OPTIONS = [
+  '美的', '小天鹅', '其他', '华凌', '海尔',
+  'COLMO', '小米', '苏泊尔', 'TOSHIBA（东芝）', 'Comfee',
+  'Bugu（布谷）', 'AEG', 'Eureka',
 ];
 
-// 执行类型选项
+// 平铺国家列表（兼容旧代码）
+export const SALES_REGION_OPTIONS = REGION_TREE.flatMap(g =>
+  g.countries.map(c => ({ label: c.label, value: c.value, group: g.label }))
+);
+
+// 执行类型选项（移除体验测评）
 export const EXECUTION_TYPE_OPTIONS: { label: string; value: ExecutionType }[] = [
   { label: '定性', value: '定性' },
   { label: '定量', value: '定量' },
-  { label: '体验测评', value: '体验测评' },
   { label: '大数据', value: '大数据' },
+];
+
+// 项目类型选项（非必填，多选）
+export const PROJECT_TYPE_OPTIONS = [
+  { label: '研究类项目', value: '研究类项目' },
+  { label: '体验类项目', value: '体验类项目' },
 ];
 
 // 研究类型选项
@@ -146,3 +239,27 @@ export const RESEARCH_TYPE_OPTIONS: { label: string; value: ResearchType; descri
   { label: '上市后产品优化', value: '上市后产品优化', description: '老品回访' },
   { label: '其他专题研究', value: '其他专题研究', description: '' },
 ];
+
+// 生成项目编号
+let _projectNoCounter = 1000;
+export const generateProjectNo = () => {
+  _projectNoCounter += 1;
+  const year = new Date().getFullYear();
+  return `YY-${year}-${String(_projectNoCounter).padStart(4, '0')}`;
+};
+
+// 默认 AIField 工厂
+export const defaultAIField = (mode: AIFieldMode = 'ai'): AIField => ({ mode, value: '' });
+
+// 兼容旧代码（展平所有品类）
+export const CATEGORY_OPTIONS = Object.values(BUSINESS_UNIT_CATEGORY_MAP).flat();
+
+// ─── AI访谈洞察文件引用（跨页面共享）─────────────────────────────────
+export interface AIInterviewFileRef {
+  id: string;          // InterviewFile.id
+  ftNo: string;        // e.g. 'FT101'
+  filename: string;
+  execType: '定性' | '定量';  // 只传定性/定量
+  projectId: string;   // InterviewProject.projectId
+  projectName: string;
+}

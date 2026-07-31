@@ -28,13 +28,23 @@ import {
   CalendarOutlined,
   BarChartOutlined,
   ExperimentOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { Project, ExecutionType, ProjectFile } from '../types/project';
-import { RESEARCH_TYPE_OPTIONS, BUSINESS_UNIT_OPTIONS, BUSINESS_UNIT_CATEGORY_MAP } from '../types/project';
-import { mockProjects } from '../data/mockData';
+import type { AIInterviewFileRef } from '../types/project';
+import { RESEARCH_TYPE_OPTIONS, BUSINESS_UNIT_OPTIONS, BUSINESS_UNIT_CATEGORY_MAP, generateProjectNo } from '../types/project';
 import ProjectForm from '../components/ProjectForm';
 import ProjectDetail from '../components/ProjectDetail';
+import AIAgentDrawer from '../components/AIAgentDrawer';
+
+interface ProjectListProps {
+  onNavigateInterview?: () => void;
+  projects: Project[];
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  aiFiles?: AIInterviewFileRef[];
+  usedAIFileIds?: Set<string>;
+}
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -167,8 +177,13 @@ const StatCard: React.FC<StatCardProps> = ({ label, count, icon, active, onClick
 );
 
 // ─── 主组件 ───────────────────────────────────────────────────────────
-const ProjectList: React.FC = () => {
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+const ProjectList: React.FC<ProjectListProps> = ({
+  onNavigateInterview,
+  projects,
+  setProjects,
+  aiFiles = [],
+  usedAIFileIds = new Set(),
+}) => {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -179,6 +194,7 @@ const ProjectList: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string | undefined>();
   const [filterResearch, setFilterResearch] = useState<string | undefined>();
   const [filterExecution, setFilterExecution] = useState<string | undefined>();
+  const [agentOpen, setAgentOpen] = useState(false);
 
   // 统计标签选中态（null = 全部）
   const [activeStatKey, setActiveStatKey] = useState<string | null>(null);
@@ -248,11 +264,11 @@ const ProjectList: React.FC = () => {
       const matchSearch =
         !searchText ||
         p.projectName.toLowerCase().includes(searchText.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchText.toLowerCase()) ||
+        (p.category || []).some(c => c.toLowerCase().includes(searchText.toLowerCase())) ||
         (p.businessUnit || '').includes(searchText) ||
         p.salesRegion.some(r => r.includes(searchText));
       const matchBU = !filterBU || p.businessUnit === filterBU;
-      const matchCategory = !filterCategory || p.category === filterCategory;
+      const matchCategory = !filterCategory || (p.category || []).includes(filterCategory);
       const matchResearch = !filterResearch || p.researchType === filterResearch;
       const matchExecution = !filterExecution || p.executionType.includes(filterExecution as ExecutionType);
       return matchStat && matchSearch && matchBU && matchCategory && matchResearch && matchExecution;
@@ -263,6 +279,7 @@ const ProjectList: React.FC = () => {
     const newProject: Project = {
       ...data,
       id: String(Date.now()),
+      projectNo: data.projectNo || generateProjectNo(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -330,6 +347,11 @@ const ProjectList: React.FC = () => {
           >
             {text}
           </Button>
+          {record.projectNo && (
+            <div style={{ fontSize: 11, color: '#8c8c8c', fontFamily: 'monospace', marginTop: 2 }}>
+              {record.projectNo}
+            </div>
+          )}
           <div style={{ marginTop: 4 }}>
             <Space size={4} wrap>
               {record.executionType.map(t => (
@@ -377,8 +399,17 @@ const ProjectList: React.FC = () => {
       title: '所属品类',
       dataIndex: 'category',
       key: 'category',
-      width: 110,
-      render: (cat: string) => <Tag color="processing">{cat}</Tag>,
+      width: 130,
+      render: (cats: string[]) => (
+        <Space size={4} wrap>
+          {(cats || []).slice(0, 2).map(c => <Tag key={c} color="processing" style={{ fontSize: 11 }}>{c}</Tag>)}
+          {(cats || []).length > 2 && (
+            <Tooltip title={(cats || []).slice(2).join('、')}>
+              <Tag style={{ fontSize: 11 }}>+{(cats || []).length - 2}</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
     },
     {
       title: '研究类型',
@@ -396,44 +427,64 @@ const ProjectList: React.FC = () => {
       dataIndex: 'projectBackground',
       key: 'projectBackground',
       width: 200,
-      render: (text: string) => text ? (
-        <Tooltip title={text} placement="topLeft">
-          <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
-        </Tooltip>
-      ) : <Text type="secondary">-</Text>,
+      render: (field: { mode: string; value: string } | string) => {
+        const text = typeof field === 'string' ? field : field?.value;
+        const isAI = typeof field === 'object' && field?.mode === 'ai' && !field?.value;
+        if (isAI) return <Text type="secondary" style={{ fontSize: 12 }}>AI提炼中...</Text>;
+        return text ? (
+          <Tooltip title={text} placement="topLeft">
+            <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
+          </Tooltip>
+        ) : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: '项目目的',
       dataIndex: 'projectPurpose',
       key: 'projectPurpose',
       width: 200,
-      render: (text: string) => text ? (
-        <Tooltip title={text} placement="topLeft">
-          <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
-        </Tooltip>
-      ) : <Text type="secondary">-</Text>,
+      render: (field: { mode: string; value: string } | string) => {
+        const text = typeof field === 'string' ? field : field?.value;
+        const isAI = typeof field === 'object' && field?.mode === 'ai' && !field?.value;
+        if (isAI) return <Text type="secondary" style={{ fontSize: 12 }}>AI提炼中...</Text>;
+        return text ? (
+          <Tooltip title={text} placement="topLeft">
+            <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
+          </Tooltip>
+        ) : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: '主要结论',
       dataIndex: 'mainConclusion',
       key: 'mainConclusion',
       width: 200,
-      render: (text: string) => text ? (
-        <Tooltip title={text} placement="topLeft">
-          <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
-        </Tooltip>
-      ) : <Text type="secondary">-</Text>,
+      render: (field: { mode: string; value: string } | string) => {
+        const text = typeof field === 'string' ? field : field?.value;
+        const isAI = typeof field === 'object' && field?.mode === 'ai' && !field?.value;
+        if (isAI) return <Text type="secondary" style={{ fontSize: 12 }}>AI提炼中...</Text>;
+        return text ? (
+          <Tooltip title={text} placement="topLeft">
+            <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
+          </Tooltip>
+        ) : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: '后续工作方向',
       dataIndex: 'followUpDirection',
       key: 'followUpDirection',
       width: 200,
-      render: (text: string) => text ? (
-        <Tooltip title={text} placement="topLeft">
-          <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
-        </Tooltip>
-      ) : <Text type="secondary">-</Text>,
+      render: (field: { mode: string; value: string } | string) => {
+        const text = typeof field === 'string' ? field : field?.value;
+        const isAI = typeof field === 'object' && field?.mode === 'ai' && !field?.value;
+        if (isAI) return <Text type="secondary" style={{ fontSize: 12 }}>AI提炼中...</Text>;
+        return text ? (
+          <Tooltip title={text} placement="topLeft">
+            <Text ellipsis style={{ maxWidth: 180, display: 'block' }}>{text}</Text>
+          </Tooltip>
+        ) : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: '附件',
@@ -524,27 +575,44 @@ const ProjectList: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.2 }}>
-                  企划项目管理
+                  用研体验项目
                 </div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
-                  集中管理企划研究项目，沉淀知识资产
+                  集中管理用研体验项目，沉淀知识资产
                 </div>
               </div>
             </div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => handleOpenCreate()}
-              style={{
-                background: '#1677ff',
-                borderRadius: 8,
-                fontWeight: 500,
-                height: 36,
-                paddingInline: 20,
-              }}
-            >
-              新增项目
-            </Button>
+            <Space size={8}>
+              <Button
+                icon={<RobotOutlined />}
+                onClick={() => onNavigateInterview?.()}
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 500,
+                  height: 36,
+                  paddingInline: 20,
+                  background: 'linear-gradient(135deg, #f0e8ff 0%, #e8f4ff 100%)',
+                  borderColor: '#d3adf7',
+                  color: '#722ed1',
+                }}
+              >
+                AI访谈洞察
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenCreate()}
+                style={{
+                  background: '#1677ff',
+                  borderRadius: 8,
+                  fontWeight: 500,
+                  height: 36,
+                  paddingInline: 20,
+                }}
+              >
+                新增项目
+              </Button>
+            </Space>
           </div>
 
           {/* ── 统计标签卡片行 ── */}
@@ -692,6 +760,8 @@ const ProjectList: React.FC = () => {
         open={formOpen}
         mode={formMode}
         initialData={editingProject ?? undefined}
+        aiFiles={aiFiles}
+        usedAIFileIds={usedAIFileIds}
         onClose={() => {
           setFormOpen(false);
           setEditingProject(null);
@@ -707,6 +777,45 @@ const ProjectList: React.FC = () => {
           setDetailOpen(false);
           setSelectedProject(null);
         }}
+      />
+
+      {/* ── 悬浮 AI 按钮 ── */}
+      <div
+        onClick={() => setAgentOpen(true)}
+        title="GVOC 用研 AI 助手"
+        style={{
+          position: 'fixed',
+          right: 32,
+          bottom: 40,
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1677ff 0%, #722ed1 100%)',
+          boxShadow: '0 4px 20px rgba(22,119,255,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 999,
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.1)';
+          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 28px rgba(22,119,255,0.55)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(22,119,255,0.45)';
+        }}
+      >
+        <RobotOutlined style={{ fontSize: 24, color: '#fff' }} />
+      </div>
+
+      {/* ── AI Agent 对话抽屉 ── */}
+      <AIAgentDrawer
+        open={agentOpen}
+        onClose={() => setAgentOpen(false)}
+        projects={projects}
       />
     </div>
   );
