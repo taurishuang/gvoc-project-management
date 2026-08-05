@@ -3,5 +3,5 @@ providers = ["node"]
 [phases.build]
 cmds = ["npm install", "npm run build"]
 
-[start]
+[phases.start]
 cmd = "npm run start"
