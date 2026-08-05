@@ -14,7 +14,6 @@ import {
   Radio,
   Form,
   Divider,
-  Checkbox,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -607,24 +606,26 @@ type ImportMode = 'project' | 'interview';
 type UploadMode = 'audio' | 'text';
 type ProjectLinkMode = 'existing' | 'new' | 'none';
 
+// 音视频扩展名判断
+const isAudioFile = (filename: string) => /\.(mp3|wav|m4a|aac|avi|mov|mp4|flac|ogg)$/i.test(filename);
+
+// 访谈提纲选项（全局复用）
 const OUTLINE_OPTIONS = [
-  { label: '通用访谈提纲V1.0', value: 'outline_1' },
-  { label: 'Z世代空调使用访谈提纲V2.0', value: 'outline_2' },
-  { label: '洗碗机用户行为研究提纲', value: 'outline_3' },
-  { label: '智能家居使用体验提纲', value: 'outline_4' },
+  { label: '美妆冰箱用户访谈提纲V2.0', value: 'outline1' },
+  { label: 'Z世代空调使用访谈提纲V2.0', value: 'outline2' },
+  { label: '洗衣机概念测试访谈提纲', value: 'outline3' },
+  { label: '风管机购买决策访谈提纲', value: 'outline4' },
 ];
 
+// 音频语言（含粤语）；文本语言（不含粤语）
 const AUDIO_LANGUAGE_OPTIONS = [
-  { label: '普通话', value: 'zh-CN' },
-  { label: '粤语', value: 'zh-YUE' },
-  { label: '英语', value: 'en' },
-  { label: '日语', value: 'ja' },
+  { label: '中文(普通话)', value: 'zh-CN' },
+  { label: '中文(粤语)', value: 'zh-HK' },
+  { label: 'English', value: 'en' },
 ];
-
 const TEXT_LANGUAGE_OPTIONS = [
-  { label: '中文', value: 'zh-CN' },
-  { label: '英文', value: 'en' },
-  { label: '日文', value: 'ja' },
+  { label: '中文(普通话)', value: 'zh-CN' },
+  { label: 'English', value: 'en' },
 ];
 
 const SPEAKER_OPTIONS = [
@@ -642,7 +643,7 @@ interface ImportModalProps {
     projectId?: string;
     projectOutline?: string;
     projectLanguage?: string;
-    selectedFileIds?: string[];
+    fileConfigs?: Record<string, { speakerCount: string }>;
     uploadMode?: UploadMode;
     files?: UploadFile[];
     language?: string;
@@ -658,14 +659,21 @@ interface ImportModalProps {
 
 const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, projectOptions }) => {
   // ── 顶层模式 ──
-  const [importMode, setImportMode] = useState<ImportMode>('interview');
+  const [importMode, setImportMode] = useState<ImportMode>('project');
 
   // ── 按项目洞察 ──
   const [selectedProject, setSelectedProject] = useState<string | undefined>();
   const [projectOutline, setProjectOutline] = useState<string | undefined>();
   const [projectLanguage, setProjectLanguage] = useState('zh-CN'); // 统一语言
-  // 按项目导入：勾选的文件 id 集合
-  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  // 每文件仅存 speakerCount（语言统一，提纲统一）
+  const [fileConfigs, setFileConfigs] = useState<Record<string, { speakerCount: string }>>({});
+
+  const updateFileConfig = (fileId: string, patch: Partial<{ speakerCount: string }>) => {
+    setFileConfigs(prev => {
+      const existing = prev[fileId] ?? { speakerCount: 'auto' };
+      return { ...prev, [fileId]: { ...existing, ...patch } };
+    });
+  };
 
   // ── 按访谈洞察 ──
   const [uploadMode, setUploadMode] = useState<UploadMode>('audio');
@@ -699,11 +707,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
   };
 
   const reset = () => {
-    setImportMode('interview');
+    setImportMode('project');
     setSelectedProject(undefined);
     setProjectOutline(undefined);
     setProjectLanguage('zh-CN');
-    setSelectedFileIds(new Set());
+    setFileConfigs({});
     setUploadMode('audio');
     setFileList([]);
     setLanguage('zh-CN');
@@ -723,7 +731,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
       projectId: selectedProject,
       projectOutline,
       projectLanguage,
-      selectedFileIds: Array.from(selectedFileIds),
+      fileConfigs,
       uploadMode,
       files: fileList,
       language,
@@ -758,16 +766,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
           style={{ display: 'flex', gap: 0 }}
         >
           <Radio.Button
-            value="interview"
-            style={{ flex: 1, textAlign: 'center', borderRadius: '6px 0 0 6px', fontWeight: importMode === 'interview' ? 600 : 400 }}
-          >
-            按访谈导入
-          </Radio.Button>
-          <Radio.Button
             value="project"
-            style={{ flex: 1, textAlign: 'center', borderRadius: '0 6px 6px 0', fontWeight: importMode === 'project' ? 600 : 400 }}
+            style={{ flex: 1, textAlign: 'center', borderRadius: '6px 0 0 6px', fontWeight: importMode === 'project' ? 600 : 400 }}
           >
             按项目导入
+          </Radio.Button>
+          <Radio.Button
+            value="interview"
+            style={{ flex: 1, textAlign: 'center', borderRadius: '0 6px 6px 0', fontWeight: importMode === 'interview' ? 600 : 400 }}
+          >
+            按访谈导入
           </Radio.Button>
         </Radio.Group>
       </div>
@@ -784,7 +792,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
                 placeholder="请选择已有项目（自动同步定性+定量文件）"
                 style={{ width: '100%' }}
                 value={selectedProject}
-                onChange={v => { setSelectedProject(v); setSelectedFileIds(new Set()); }}
+                onChange={v => { setSelectedProject(v); setFileConfigs({}); }}
                 options={projectOptions}
                 showSearch
                 filterOption={(input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())}
@@ -826,7 +834,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
           {selectedProject && syncedFiles.length > 0 && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
-                已自动同步 <span style={{ color: '#1677ff', fontWeight: 600 }}>{syncedFiles.length}</span> 个定性/定量访谈文件，请勾选要提交的文件：
+                已自动同步 <span style={{ color: '#1677ff', fontWeight: 600 }}>{syncedFiles.length}</span> 个定性/定量访谈文件
+                {syncedFiles.some(f => isAudioFile(f.filename)) && '，音视频文件请配置说话人数量'}：
               </div>
               <div style={{ border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
                 {/* 表头 */}
@@ -836,52 +845,46 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
                   borderBottom: '1px solid #e8ecf0',
                   fontSize: 12, color: '#6b7280', fontWeight: 500,
                 }}>
-                  <Checkbox
-                    checked={syncedFiles.length > 0 && syncedFiles.every(f => selectedFileIds.has(f.id))}
-                    indeterminate={syncedFiles.some(f => selectedFileIds.has(f.id)) && !syncedFiles.every(f => selectedFileIds.has(f.id))}
-                    onChange={e => {
-                      if (e.target.checked) {
-                        setSelectedFileIds(new Set(syncedFiles.map(f => f.id)));
-                      } else {
-                        setSelectedFileIds(new Set());
-                      }
-                    }}
-                  />
                   <span style={{ flex: 1 }}>文件</span>
+                  <span style={{ width: 110, flexShrink: 0 }}>说话人数量</span>
                 </div>
-                {syncedFiles.map((f, i) => (
-                  <div
-                    key={f.id}
-                    onClick={() => {
-                      const next = new Set(selectedFileIds);
-                      if (next.has(f.id)) next.delete(f.id); else next.add(f.id);
-                      setSelectedFileIds(next);
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '8px 12px',
-                      borderBottom: i < syncedFiles.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      background: selectedFileIds.has(f.id) ? '#f0f7ff' : (i % 2 === 0 ? '#fff' : '#fafafa'),
-                      cursor: 'pointer', transition: 'background 0.15s',
-                    }}
-                  >
-                    <Checkbox checked={selectedFileIds.has(f.id)} style={{ pointerEvents: 'none' }} />
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <FileTextOutlined style={{ color: '#1677ff', fontSize: 12, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, flexShrink: 0 }}>{f.ftNo}</span>
-                      <span style={{ fontSize: 12, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {f.filename}
-                      </span>
-                      <TypeTag type={f.type} />
+                {syncedFiles.map((f, i) => {
+                  const cfg = fileConfigs[f.id] ?? { speakerCount: 'auto' };
+                  const audio = isAudioFile(f.filename);
+                  return (
+                    <div
+                      key={f.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 12px',
+                        borderBottom: i < syncedFiles.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        background: i % 2 === 0 ? '#fff' : '#fafafa',
+                      }}
+                    >
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <FileTextOutlined style={{ color: '#1677ff', fontSize: 12, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, flexShrink: 0 }}>{f.ftNo}</span>
+                        <span style={{ fontSize: 12, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {f.filename}
+                        </span>
+                        <TypeTag type={f.type} />
+                      </div>
+                      {/* 说话人数量：仅音视频 */}
+                      {audio ? (
+                        <Select
+                          size="small"
+                          value={cfg.speakerCount}
+                          onChange={v => updateFileConfig(f.id, { speakerCount: v })}
+                          style={{ width: 110, flexShrink: 0 }}
+                          options={SPEAKER_OPTIONS}
+                        />
+                      ) : (
+                        <span style={{ width: 110, flexShrink: 0, fontSize: 12, color: '#bfbfbf', paddingLeft: 4 }}>—</span>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              {selectedFileIds.size > 0 && (
-                <div style={{ fontSize: 12, color: '#1677ff', marginTop: 6 }}>
-                  已勾选 {selectedFileIds.size} 个文件
-                </div>
-              )}
             </div>
           )}
 
@@ -918,7 +921,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
                   transition: 'all 0.15s',
                 }}
               >
-                {m === 'audio' ? '导入音频' : '导入文档'}
+                {m === 'audio' ? '导入音频' : '导入文本'}
               </div>
             ))}
           </div>
@@ -986,7 +989,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
                     ]}
                   />
                 </Form.Item>
-                <Form.Item label={<span style={{ fontSize: 13 }}>文档语言</span>} style={{ margin: 0 }}>
+                <Form.Item label={<span style={{ fontSize: 13 }}>文本语言</span>} style={{ margin: 0 }}>
                   <Select value={language} onChange={setLanguage} style={{ width: '100%' }} options={TEXT_LANGUAGE_OPTIONS} />
                 </Form.Item>
                 <Form.Item
@@ -1039,17 +1042,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
             style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}
           >
             <Radio value="none" style={{ fontSize: 13 }}>暂不关联</Radio>
-            <Radio value="existing" style={{ fontSize: 13 }}>
-              关联已有项目
-              <Button
-                type="link"
-                size="small"
-                style={{ fontSize: 12, padding: '0 4px', marginLeft: 4 }}
-                onClick={e => { e.stopPropagation(); window.open('/?openCreate=true', '_blank'); }}
-              >
-                前往创建项目
-              </Button>
-            </Radio>
+            <Radio value="existing" style={{ fontSize: 13 }}>关联已有项目</Radio>
+            <Radio value="new" style={{ fontSize: 13 }}>新增项目</Radio>
           </Radio.Group>
 
           {projectLinkMode === 'existing' && (
@@ -1061,6 +1055,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ open, onClose, onSubmit, proj
               options={projectOptions}
               allowClear showSearch
               filterOption={(input, opt) => (opt?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+            />
+          )}
+          {projectLinkMode === 'new' && (
+            <Input
+              placeholder="请输入新项目名称"
+              value={newProjectName}
+              onChange={e => setNewProjectName(e.target.value)}
+              style={{ width: '100%', marginBottom: 4 }}
             />
           )}
         </div>
@@ -1203,6 +1205,37 @@ const AIInterviewPage: React.FC<AIInterviewPageProps> = ({ onBack, onSyncToProje
           });
         });
         message.success(`已将 ${newFiles.length} 个文件导入项目`);
+      } else if (data.projectLinkMode === 'new' && data.newProjectName?.trim()) {
+        // 新增项目
+        const outlineLabel = data.outline
+          ? OUTLINE_OPTIONS.find(o => o.value === data.outline)?.label
+          : undefined;
+        const newProject: InterviewProject = {
+          id: `p_new_${Date.now()}`,
+          projectId: `YY-${new Date().getFullYear()}-NEW`,
+          projectName: data.newProjectName.trim(),
+          year: String(new Date().getFullYear()),
+          category: '—',
+          types: [(data.interviewType as InterviewType) ?? '定性'],
+          creator: '当前用户',
+          creatorId: 'me',
+          updatedAt: now,
+          duration: '0:00',
+          status: '进行中',
+          outline: outlineLabel,
+          interviews: newFiles,
+        };
+        setProjects(prev => [newProject, ...prev]);
+        // 同步到用研体验项目列表：新建项目（取第一个文件代表）
+        onSyncToProjectList?.('addProject', {
+          newProjectName: newProject.projectName,
+          newProjectYear: newProject.year,
+          newExecutionTypes: newProject.types,
+          newOutline: outlineLabel,
+          filename: newFiles[0]?.filename,
+          executionType: newFiles[0]?.type,
+        });
+        message.success(`已新建项目「${newProject.projectName}」并导入 ${newFiles.length} 个文件`);
       } else {
         // 暂不关联 → 不挂项目，只提示
         message.success(`已导入 ${newFiles.length} 个访谈文件（未关联项目）`);
@@ -1276,34 +1309,84 @@ const AIInterviewPage: React.FC<AIInterviewPageProps> = ({ onBack, onSyncToProje
             <Title level={4} style={{ margin: '0 28px 0 0', fontSize: 18, color: '#1a1a2e', whiteSpace: 'nowrap' }}>
               AI访谈洞察
             </Title>
-            {/* Flow steps — 新流程：创建项目 → 创建提纲 → 上传音频/文档 → AI总结 → 生成报告 */}
+            {/* Flow steps — 新流程：音频路径 & 文本路径 → AI转文本 → 在线修订 → AI生成报告 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1, flexWrap: 'nowrap', overflow: 'hidden' }}>
-              {[
-                { num: 1, label: '创建项目', icon: '📁', color: { bg: '#e6f4ff', border: '#91caff', text: '#1677ff', dot: '#1677ff' } },
-                { num: 2, label: '创建提纲', icon: '📝', color: { bg: '#e6f4ff', border: '#91caff', text: '#1677ff', dot: '#1677ff' } },
-                { num: 3, label: '上传音频/文档', icon: '🎙️', color: { bg: '#f9f0ff', border: '#d3adf7', text: '#722ed1', dot: '#722ed1' } },
-                { num: 4, label: 'AI总结', icon: '✨', color: { bg: '#f9f0ff', border: '#d3adf7', text: '#722ed1', dot: '#722ed1' } },
-                { num: 5, label: '生成报告', icon: '📊', color: { bg: '#fff7e6', border: '#ffd591', text: '#d46b08', dot: '#fa8c16' } },
-              ].map((s, i, arr) => (
-                <React.Fragment key={s.num}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                    background: s.color.bg, border: `1px solid ${s.color.border}`,
-                    borderRadius: 20, padding: '5px 14px', fontSize: 12, color: s.color.text, fontWeight: s.num === 5 ? 600 : 500,
+              {/* 步骤1：两条上传入口（上下堆叠） */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                {[
+                  { label: '上传访谈录音', icon: '🎙️' },
+                  { label: '上传访谈文本', icon: '📄' },
+                ].map((s, i) => (
+                  <div key={s.label} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: '#e6f4ff', border: '1px solid #91caff',
+                    borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#1677ff',
+                    fontWeight: 500,
                   }}>
                     <span style={{
                       width: 16, height: 16, borderRadius: '50%',
-                      background: s.color.dot, color: '#fff',
+                      background: '#1677ff', color: '#fff',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 9, fontWeight: 700, flexShrink: 0,
-                    }}>{s.num}</span>
+                    }}>{i + 1}</span>
                     <span>{s.icon}</span><span>{s.label}</span>
                   </div>
-                  {i < arr.length - 1 && (
-                    <ArrowRightOutlined style={{ fontSize: 11, color: '#bfbfbf', margin: '0 8px', flexShrink: 0 }} />
-                  )}
-                </React.Fragment>
-              ))}
+                ))}
+              </div>
+
+              <ArrowRightOutlined style={{ fontSize: 11, color: '#bfbfbf', margin: '0 8px', flexShrink: 0 }} />
+
+              {/* 步骤2：AI语音转文本 */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                background: 'linear-gradient(135deg,#f9f0ff,#efe8ff)',
+                border: '1px solid #d3adf7', borderRadius: 20,
+                padding: '5px 14px', fontSize: 12, color: '#722ed1', fontWeight: 500,
+              }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: '#722ed1', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 700, flexShrink: 0,
+                }}>3</span>
+                <span>✨</span><span>AI语音转文本</span>
+              </div>
+
+              <ArrowRightOutlined style={{ fontSize: 11, color: '#bfbfbf', margin: '0 8px', flexShrink: 0 }} />
+
+              {/* 步骤3：在线修订 */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                background: 'linear-gradient(135deg,#f9f0ff,#efe8ff)',
+                border: '1px solid #d3adf7', borderRadius: 20,
+                padding: '5px 14px', fontSize: 12, color: '#722ed1', fontWeight: 500,
+              }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: '#722ed1', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 700, flexShrink: 0,
+                }}>4</span>
+                <span>✏️</span><span>在线修订</span>
+              </div>
+
+              <ArrowRightOutlined style={{ fontSize: 11, color: '#bfbfbf', margin: '0 8px', flexShrink: 0 }} />
+
+              {/* 步骤4：AI生成洞察报告 */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                background: 'linear-gradient(135deg,#fff7e6,#fff1e0)',
+                border: '1px solid #ffd591', borderRadius: 20,
+                padding: '5px 14px', fontSize: 12, color: '#d46b08', fontWeight: 600,
+              }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: '#fa8c16', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 700, flexShrink: 0,
+                }}>5</span>
+                <span>📊</span><span>AI生成洞察报告</span>
+              </div>
             </div>
           </div>
         </div>
