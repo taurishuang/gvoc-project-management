@@ -16,13 +16,11 @@ import {
   Steps,
   Alert,
   Divider,
-  Segmented,
 } from 'antd';
 import {
   InboxOutlined,
   DownloadOutlined,
   RobotOutlined,
-  EditOutlined,
   SearchOutlined,
   CheckOutlined,
   FileTextOutlined,
@@ -46,7 +44,6 @@ import {
   BUSINESS_UNIT_OPTIONS,
   BUSINESS_UNIT_CATEGORY_MAP,
   BRAND_OPTIONS,
-  PROJECT_TYPE_OPTIONS,
   generateProjectNo,
   defaultAIField,
 } from '../types/project';
@@ -61,22 +58,23 @@ interface ProjectFormProps {
   onSubmit: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void;
   initialData?: Project;
   mode?: 'create' | 'edit';
-  aiFiles?: AIInterviewFileRef[];       // AI访谈洞察已上传的文件
-  usedAIFileIds?: Set<string>;          // 已归属到其他项目的文件id，不允许再次添加
+  aiFiles?: AIInterviewFileRef[];  // AI访谈洞察已上传的文件
 }
 
-const QUAL_TYPES: ExecutionType[] = ['定性', '定量'];
+const QUAL_TYPES: ExecutionType[] = ['定性', '定量', '体验测评'];
 
 // 各执行类型允许的文件格式
 const EXEC_TYPE_ACCEPT: Record<string, string> = {
-  定性: '.mp3,.wav,.aac,.m4a,.mp4,.mov,.avi,.mkv,.wmv,.flac',
+  定性: '.mp3,.wav,.aac,.m4a,.mp4,.mov,.avi,.mkv,.wmv,.doc,.docx',
   定量: '.doc,.docx,.xls,.xlsx',
+  体验测评: '.doc,.docx,.xls,.xlsx',
   大数据: '.doc,.docx,.xls,.xlsx',
 };
 const EXEC_TYPE_HINT: Record<string, string> = {
-  定性: '支持音频（MP3/WAV/AAC/M4A/FLAC）、视频（MP4/MOV/AVI/MKV）',
+  定性: '支持音频（MP3/WAV）、视频（MP4/MOV）、Word',
   定量: '支持 Word、Excel',
-  大数据: '仅支持按模版上传（Excel）',
+  体验测评: '支持 Word、Excel',
+  大数据: '支持 Word、Excel',
 };
 // 综合文件格式
 const GENERAL_ACCEPT = '.ppt,.pptx,.pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif';
@@ -518,46 +516,157 @@ const CascadePanel: React.FC<CascadePanelProps> = ({
 };
 
 // ─── AI Field 组件 ───────────────────────────────────────────────────
-const AIFieldInput: React.FC<{ label: string; value: AIField; onChange: (v: AIField) => void }> = ({
-  label, value, onChange,
-}) => {
+const AIFieldInput: React.FC<{
+  label: string;
+  value: AIField;
+  onChange: (v: AIField) => void;
+  availableFiles?: UploadFile[];   // 该项目已上传的所有文件
+}> = ({ label, value, onChange, availableFiles = [] }) => {
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [selectedFileUid, setSelectedFileUid] = useState<string | null>(null);
+
+  const handleAIExtract = () => {
+    // 若只有一个文件直接选中并触发提炼，否则弹出选择器
+    if (availableFiles.length === 1) {
+      setSelectedFileUid(availableFiles[0].uid);
+      onChange({ mode: 'ai', value: '' });
+    } else {
+      setFilePickerOpen(v => !v);
+    }
+  };
+
+  const handleSelectFile = (uid: string) => {
+    setSelectedFileUid(uid);
+    setFilePickerOpen(false);
+    onChange({ mode: 'ai', value: '' });
+  };
+
+  const handleCancelAI = () => {
+    setSelectedFileUid(null);
+    onChange({ mode: 'manual', value: value.value });
+  };
+
   const isAI = value.mode === 'ai';
+  const selectedFile = availableFiles.find(f => f.uid === selectedFileUid);
+
   return (
     <div style={{
       marginBottom: 16,
       background: '#fafafa',
-      border: '1px solid #f0f0f0',
+      border: `1px solid ${isAI ? '#91caff' : '#f0f0f0'}`,
       borderRadius: 8,
       padding: '12px 16px',
+      transition: 'border-color 0.2s',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <Text strong style={{ fontSize: 14 }}>{label}</Text>
-        <Segmented
-          size="small"
-          value={isAI ? 'ai' : 'manual'}
-          onChange={(v) => {
-            const mode = v as 'ai' | 'manual';
-            onChange({ mode, value: mode === 'ai' ? '' : value.value });
-          }}
-          options={[
-            { label: <Space size={4}><RobotOutlined /><span>AI提炼</span></Space>, value: 'ai' },
-            { label: <Space size={4}><EditOutlined /><span>手动填写</span></Space>, value: 'manual' },
-          ]}
-        />
+        <Space size={8}>
+          {isAI && (
+            <Button
+              size="small"
+              onClick={handleCancelAI}
+              style={{ fontSize: 12 }}
+            >
+              取消提炼
+            </Button>
+          )}
+          {!isAI && (
+            <Button
+              size="small"
+              icon={<RobotOutlined />}
+              type="primary"
+              ghost
+              onClick={handleAIExtract}
+              style={{ fontSize: 12 }}
+            >
+              AI提炼
+            </Button>
+          )}
+        </Space>
       </div>
-      {isAI ? (
-        <Alert
-          type="info" showIcon icon={<RobotOutlined />}
-          message="提交后AI将自动从上传的文件中提炼该字段内容"
-          style={{ borderRadius: 6, fontSize: 13 }}
-        />
-      ) : (
+
+      {/* 手动填写区 */}
+      {!isAI && (
         <TextArea
           rows={3} maxLength={500} showCount
           placeholder={`请填写${label}...`}
           value={value.value}
           onChange={(e) => onChange({ mode: 'manual', value: e.target.value })}
         />
+      )}
+
+      {/* AI提炼状态 */}
+      {isAI && (
+        <div>
+          {selectedFile ? (
+            <Alert
+              type="success" showIcon icon={<RobotOutlined />}
+              message={
+                <span>
+                  已选择文件：<Text strong style={{ color: '#1677ff' }}>{selectedFile.name}</Text>
+                  ，提交后 AI 将自动从该文件提炼内容
+                </span>
+              }
+              style={{ borderRadius: 6, fontSize: 13 }}
+            />
+          ) : (
+            <Alert
+              type="info" showIcon icon={<RobotOutlined />}
+              message={
+                availableFiles.length === 0
+                  ? '请先在「执行信息」中上传文件，才能使用AI提炼'
+                  : '提交后 AI 将自动从上传的文件中提炼该字段内容'
+              }
+              style={{ borderRadius: 6, fontSize: 13 }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* 文件选择器下拉 */}
+      {filePickerOpen && availableFiles.length > 0 && (
+        <div style={{
+          marginTop: 8,
+          border: '1px solid #d9d9d9',
+          borderRadius: 8,
+          background: '#fff',
+          overflow: 'hidden',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        }}>
+          <div style={{
+            padding: '6px 12px',
+            background: '#f0f7ff',
+            borderBottom: '1px solid #d9d9d9',
+            fontSize: 12, color: '#1677ff', fontWeight: 600,
+          }}>
+            选择要提炼的文件
+          </div>
+          {availableFiles.map((f, i) => (
+            <div
+              key={f.uid}
+              onClick={() => handleSelectFile(f.uid)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px',
+                borderBottom: i < availableFiles.length - 1 ? '1px solid #f0f0f0' : 'none',
+                cursor: 'pointer',
+                fontSize: 13,
+                background: selectedFileUid === f.uid ? '#f0f7ff' : '#fff',
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={e => { if (selectedFileUid !== f.uid) e.currentTarget.style.background = '#f8f9fa'; }}
+              onMouseLeave={e => { if (selectedFileUid !== f.uid) e.currentTarget.style.background = '#fff'; }}
+            >
+              <span style={{ fontSize: 15 }}>{getFileIcon(f.name)}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {f.name}
+              </span>
+              {selectedFileUid === f.uid && (
+                <CheckOutlined style={{ color: '#1677ff', fontSize: 12 }} />
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -567,10 +676,11 @@ const AIFieldInput: React.FC<{ label: string; value: AIField; onChange: (v: AIFi
 const COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
   定性: { bg: '#f0f7ff', border: '#91caff', text: '#1677ff' },
   定量: { bg: '#fff7e6', border: '#ffd591', text: '#fa8c16' },
+  体验测评: { bg: '#f9f0ff', border: '#d3adf7', text: '#722ed1' },
 };
 
 const QualFieldsForm: React.FC<{
-  execType: '定性' | '定量';
+  execType: '定性' | '定量' | '体验测评';
   value: Partial<QualQtyFields>;
   onChange: (val: Partial<QualQtyFields>) => void;
   audienceFile: UploadFile | null;
@@ -618,27 +728,7 @@ const QualFieldsForm: React.FC<{
             <TextArea rows={2} placeholder="请描述目标人群特征..."
               value={value.targetAudience || ''} onChange={e => set('targetAudience', e.target.value)} />
           </Form.Item>
-          <Form.Item
-            label={
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                人群清单附件（指定模板）
-                <Button
-                  type="link" size="small"
-                  icon={<DownloadOutlined />}
-                  style={{ fontSize: 12, padding: 0, height: 'auto' }}
-                  onClick={() => {
-                    const a = document.createElement('a');
-                    a.href = '/audience-template.xlsx';
-                    a.download = '人群清单模版.xlsx';
-                    a.click();
-                  }}
-                >
-                  下载模版
-                </Button>
-              </span>
-            }
-            style={{ marginBottom: 0 }}
-          >
+          <Form.Item label="人群清单附件（指定模板）" style={{ marginBottom: 0 }}>
             <Upload maxCount={1} accept=".xlsx,.xls,.csv"
               fileList={audienceFile ? [audienceFile] : []}
               beforeUpload={(file) => {
@@ -700,29 +790,25 @@ const FileUploadBlock: React.FC<{
   onAdd: (file: UploadFile) => void;
   onRemove: (uid: string) => void;
   aiFiles?: AIInterviewFileRef[];   // 仅定性/定量时传入
-  usedAIFileIds?: Set<string>;      // 已归属到其他项目的文件id
-  isBigData?: boolean;              // 大数据：仅 .xlsx，显示模版下载
-}> = ({ catKey, fileList, onAdd, onRemove, aiFiles = [], usedAIFileIds = new Set(), isBigData = false }) => {
-  const accept = isBigData ? '.xlsx' : (catKey === '综合' ? GENERAL_ACCEPT : (EXEC_TYPE_ACCEPT[catKey] || GENERAL_ACCEPT));
+}> = ({ catKey, fileList, onAdd, onRemove, aiFiles = [] }) => {
+  const accept = catKey === '综合' ? GENERAL_ACCEPT : (EXEC_TYPE_ACCEPT[catKey] || GENERAL_ACCEPT);
   const hint = catKey === '综合' ? GENERAL_HINT : (EXEC_TYPE_HINT[catKey] || GENERAL_HINT);
 
+  // 过滤出当前类型的AI访谈文件，且尚未被选入 fileList
+  const availableAIFiles = aiFiles.filter(
+    af => af.execType === catKey && !fileList.some(f => f.uid === `ai_${af.id}`)
+  );
   // 已从AI访谈选入的文件uid集合（用于显示高亮）
   const selectedAIUids = new Set(fileList.filter(f => f.uid.startsWith('ai_')).map(f => f.uid));
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [searchText, setSearchText] = useState('');
-
-  // 过滤：当前类型 + 搜索关键字
-  const filteredAIFiles = aiFiles.filter(af => {
-    const kw = searchText.trim().toLowerCase();
-    if (!kw) return true;
-    return af.filename.toLowerCase().includes(kw) || af.ftNo.toLowerCase().includes(kw) || af.projectName.toLowerCase().includes(kw);
-  });
 
   const handleSelectAIFile = (af: AIInterviewFileRef) => {
-    // 已在 fileList 中则不重复添加
-    if (fileList.some(f => f.uid === `ai_${af.id}`)) return;
-    onAdd({ uid: `ai_${af.id}`, name: af.filename, status: 'done' });
+    onAdd({
+      uid: `ai_${af.id}`,
+      name: af.filename,
+      status: 'done',
+    });
   };
 
   return (
@@ -732,24 +818,9 @@ const FileUploadBlock: React.FC<{
           {catKey === '综合' ? '综合文件' : `「${catKey}」相关文件`}
         </Text>
         <Text type="secondary" style={{ fontSize: 12 }}>（{hint}）</Text>
-        {isBigData && (
-          <Button
-            size="small"
-            icon={<DownloadOutlined />}
-            style={{ marginLeft: 'auto', fontSize: 12 }}
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = '/bigdata-template.xlsx';
-              a.download = '大数据上传模版.xlsx';
-              a.click();
-            }}
-          >
-            下载模版
-          </Button>
-        )}
       </div>
       <Dragger
-        fileList={fileList.filter(f => !f.uid.startsWith('ai_'))}
+        fileList={fileList}
         multiple
         accept={accept}
         beforeUpload={(file) => {
@@ -760,19 +831,30 @@ const FileUploadBlock: React.FC<{
         itemRender={(_, file) => (
           <div key={file.uid} style={{
             display: 'flex', alignItems: 'center', padding: '4px 10px',
-            background: '#fafafa', borderRadius: 6, marginTop: 4,
-            border: '1px solid #f0f0f0',
+            background: selectedAIUids.has(file.uid) ? '#f0f7ff' : '#fafafa',
+            borderRadius: 6, marginTop: 4,
+            border: selectedAIUids.has(file.uid) ? '1px solid #91caff' : '1px solid #f0f0f0',
           }}>
-            <span style={{ marginRight: 8, fontSize: 14 }}>{getFileIcon(file.name)}</span>
+            {selectedAIUids.has(file.uid)
+              ? <LinkOutlined style={{ marginRight: 8, fontSize: 13, color: '#1677ff' }} />
+              : <span style={{ marginRight: 8, fontSize: 14 }}>{getFileIcon(file.name)}</span>
+            }
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{file.name}</span>
-            {file.size && (
+            {selectedAIUids.has(file.uid) && (
+              <span style={{ fontSize: 11, color: '#1677ff', marginLeft: 8, flexShrink: 0, background: '#e6f4ff', borderRadius: 4, padding: '0 5px' }}>
+                AI访谈洞察
+              </span>
+            )}
+            {file.size && !selectedAIUids.has(file.uid) && (
               <Text type="secondary" style={{ fontSize: 11, marginLeft: 8, flexShrink: 0 }}>
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </Text>
             )}
-            <Button type="text" size="small" icon={<DownloadOutlined />}
-              style={{ marginLeft: 8, color: '#1677ff', flexShrink: 0 }}
-              onClick={() => downloadFile(file)} />
+            {!selectedAIUids.has(file.uid) && (
+              <Button type="text" size="small" icon={<DownloadOutlined />}
+                style={{ marginLeft: 8, color: '#1677ff', flexShrink: 0 }}
+                onClick={() => downloadFile(file)} />
+            )}
             <Button type="text" size="small" danger style={{ marginLeft: 4, flexShrink: 0 }}
               onClick={() => onRemove(file.uid)}>
               删除
@@ -785,42 +867,16 @@ const FileUploadBlock: React.FC<{
         <p className="ant-upload-text" style={{ fontSize: 13 }}>点击或拖拽文件上传</p>
       </Dragger>
 
-      {/* 已从AI访谈添加的文件单独展示 */}
-      {fileList.filter(f => f.uid.startsWith('ai_')).map(f => {
-        // 从 uid 反查 ftNo（uid 格式为 ai_${af.id}）
-        const afId = f.uid.replace(/^ai_/, '');
-        const ftNo = aiFiles.find(af => af.id === afId)?.ftNo || '';
-        return (
-          <div key={f.uid} style={{
-            display: 'flex', alignItems: 'center', padding: '4px 10px',
-            background: '#f0f7ff', borderRadius: 6, marginTop: 4,
-            border: '1px solid #91caff',
-          }}>
-            <LinkOutlined style={{ marginRight: 8, fontSize: 13, color: '#1677ff', flexShrink: 0 }} />
-            {ftNo && (
-              <span style={{ fontSize: 11, color: '#1677ff', fontWeight: 600, marginRight: 6, flexShrink: 0, background: '#e6f4ff', borderRadius: 4, padding: '0 5px' }}>
-                {ftNo}
-              </span>
-            )}
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{f.name}</span>
-            <Button type="text" size="small" danger style={{ marginLeft: 8, flexShrink: 0 }}
-              onClick={() => onRemove(f.uid)}>
-              删除
-            </Button>
-          </div>
-        );
-      })}
-
-      {/* 搜索添加访谈文件（仅定性/定量显示） */}
+      {/* AI访谈洞察文件选择器（仅定性/定量显示） */}
       {(catKey === '定性' || catKey === '定量') && (
         <div style={{ marginTop: 8 }}>
           <Button
             size="small"
             icon={<LinkOutlined />}
             style={{ fontSize: 12, color: '#1677ff', borderColor: '#91caff', background: '#f0f7ff' }}
-            onClick={() => { setPickerOpen(v => !v); setSearchText(''); }}
+            onClick={() => setPickerOpen(v => !v)}
           >
-            搜索添加访谈文件{aiFiles.length > 0 ? `（${aiFiles.length}个可选）` : ''}
+            从AI访谈洞察选择{availableAIFiles.length > 0 ? `（${availableAIFiles.length}个可选）` : ''}
           </Button>
 
           {pickerOpen && (
@@ -828,79 +884,50 @@ const FileUploadBlock: React.FC<{
               marginTop: 8, border: '1px solid #d9d9d9', borderRadius: 8,
               background: '#fafcff', overflow: 'hidden',
             }}>
-              {/* 搜索框 */}
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                <Input
-                  prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                  placeholder="搜索文件名、访谈编号"
-                  size="small"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  allowClear
-                />
-              </div>
-              {/* 表头 */}
-              <div style={{
-                padding: '6px 12px', background: '#f0f7ff',
-                borderBottom: '1px solid #d9d9d9',
-                fontSize: 12, color: '#6b7280', fontWeight: 500,
-                display: 'flex', gap: 8, alignItems: 'center',
-              }}>
-                <span style={{ width: 72, flexShrink: 0 }}>访谈编号</span>
-                <span style={{ flex: 1 }}>文件名</span>
-                <span style={{ width: 52, flexShrink: 0 }}>操作</span>
-              </div>
-              {filteredAIFiles.length === 0 ? (
+              {availableAIFiles.length === 0 ? (
                 <div style={{ padding: '16px', textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>
-                  暂无匹配的访谈文件
+                  暂无可选的{catKey}访谈文件
                 </div>
               ) : (
-                filteredAIFiles.map(af => {
-                  const alreadyAdded = selectedAIUids.has(`ai_${af.id}`);
-                  const isUsed = usedAIFileIds.has(af.id);
-                  const disabled = isUsed && !alreadyAdded;
-                  return (
+                <>
+                  <div style={{
+                    padding: '6px 12px', background: '#f0f7ff',
+                    borderBottom: '1px solid #d9d9d9',
+                    fontSize: 12, color: '#6b7280', fontWeight: 500,
+                    display: 'flex', gap: 8,
+                  }}>
+                    <span style={{ flex: 1 }}>文件名</span>
+                    <span style={{ width: 80, flexShrink: 0 }}>FT编号</span>
+                    <span style={{ width: 160, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>所属项目</span>
+                    <span style={{ width: 48, flexShrink: 0 }}>操作</span>
+                  </div>
+                  {availableAIFiles.map(af => (
                     <div key={af.id} style={{
                       display: 'flex', alignItems: 'center', gap: 8,
                       padding: '7px 12px', borderBottom: '1px solid #f0f0f0',
                       fontSize: 12,
-                      background: disabled ? '#fafafa' : 'transparent',
-                      opacity: disabled ? 0.5 : 1,
                     }}
-                      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = '#e8f4ff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = disabled ? '#fafafa' : ''; }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#e8f4ff')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
                     >
-                      <span style={{ width: 72, flexShrink: 0, color: '#1677ff', fontWeight: 500 }}>{af.ftNo}</span>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                        <FileTextOutlined style={{ color: '#1677ff', flexShrink: 0 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>
-                          {af.filename}
-                        </span>
-                        {/* 已归属项目的显示项目名标签 */}
-                        {af.projectName && isUsed && !alreadyAdded && (
-                          <span style={{ fontSize: 11, color: '#8c8c8c', background: '#f5f5f5', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
-                            {af.projectName}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ width: 52, flexShrink: 0 }}>
-                        {alreadyAdded ? (
-                          <span style={{ fontSize: 11, color: '#52c41a' }}>已添加</span>
-                        ) : disabled ? (
-                          <span style={{ fontSize: 11, color: '#bfbfbf' }}>已归属</span>
-                        ) : (
-                          <Button
-                            type="link" size="small"
-                            style={{ padding: 0, fontSize: 12 }}
-                            onClick={() => handleSelectAIFile(af)}
-                          >
-                            添加
-                          </Button>
-                        )}
-                      </div>
+                      <FileTextOutlined style={{ color: '#1677ff', flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>
+                        {af.filename}
+                      </span>
+                      <span style={{ width: 80, flexShrink: 0, color: '#1677ff', fontWeight: 500 }}>{af.ftNo}</span>
+                      <span style={{ width: 160, flexShrink: 0, color: '#595959', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {af.projectName}
+                      </span>
+                      <Button
+                        type="link" size="small"
+                        style={{ width: 48, flexShrink: 0, padding: 0, fontSize: 12 }}
+                        onClick={() => handleSelectAIFile(af)}
+                      >
+                        选择
+                      </Button>
                     </div>
-                  );
-                })
+                  ))}
+                </>
               )}
             </div>
           )}
@@ -912,22 +939,21 @@ const FileUploadBlock: React.FC<{
 
 // ─── 主表单组件 ──────────────────────────────────────────────────────
 const ProjectForm: React.FC<ProjectFormProps> = ({
-  open, onClose, onSubmit, initialData, mode = 'create', aiFiles = [], usedAIFileIds = new Set(),
+  open, onClose, onSubmit, initialData, mode = 'create', aiFiles = [],
 }) => {
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedBU, setSelectedBU] = useState<string>(initialData?.businessUnit || '');
   const [selectedExecutionTypes, setSelectedExecutionTypes] = useState<ExecutionType[]>(initialData?.executionType || []);
-  const [qualFieldsMap, setQualFieldsMap] = useState<Partial<Record<'定性' | '定量', Partial<QualQtyFields>>>>(initialData?.qualFields || {});
+  const [qualFieldsMap, setQualFieldsMap] = useState<Partial<Record<'定性' | '定量' | '体验测评', Partial<QualQtyFields>>>>(initialData?.qualFields || {});
   const [bigDataFields, setBigDataFields] = useState<Partial<BigDataFields>>(initialData?.bigDataFields || {});
   const [audienceFileMap, setAudienceFileMap] = useState<Record<string, UploadFile | null>>({});
-  const [fileListMap, setFileListMap] = useState<Record<string, UploadFile[]>>({ 定性: [], 定量: [], 大数据: [], 综合: [] });
-  const [projectTypeVal, setProjectTypeVal] = useState<string[]>(initialData?.projectType || []);
+  const [fileListMap, setFileListMap] = useState<Record<string, UploadFile[]>>({ 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] });
   const [aiFields, setAiFields] = useState({
-    projectBackground: initialData?.projectBackground || defaultAIField('ai'),
-    projectPurpose: initialData?.projectPurpose || defaultAIField('ai'),
-    mainConclusion: initialData?.mainConclusion || defaultAIField('ai'),
-    followUpDirection: initialData?.followUpDirection || defaultAIField('ai'),
+    projectBackground: initialData?.projectBackground || defaultAIField('manual'),
+    projectPurpose: initialData?.projectPurpose || defaultAIField('manual'),
+    mainConclusion: initialData?.mainConclusion || defaultAIField('manual'),
+    followUpDirection: initialData?.followUpDirection || defaultAIField('manual'),
   });
   const [salesRegionVal, setSalesRegionVal] = useState<string[]>(initialData?.salesRegion || []);
   const [categoryVal, setCategoryVal] = useState<string[]>(initialData?.category || []);
@@ -944,17 +970,16 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setSelectedExecutionTypes(initialData?.executionType || []);
       setQualFieldsMap(initialData?.qualFields || {});
       setBigDataFields(initialData?.bigDataFields || {});
-      setProjectTypeVal(initialData?.projectType || []);
       setSalesRegionError(false);
       setExecTypeError(false);
       setAiFields({
-        projectBackground: initialData?.projectBackground || defaultAIField('ai'),
-        projectPurpose: initialData?.projectPurpose || defaultAIField('ai'),
-        mainConclusion: initialData?.mainConclusion || defaultAIField('ai'),
-        followUpDirection: initialData?.followUpDirection || defaultAIField('ai'),
+        projectBackground: initialData?.projectBackground || defaultAIField('manual'),
+        projectPurpose: initialData?.projectPurpose || defaultAIField('manual'),
+        mainConclusion: initialData?.mainConclusion || defaultAIField('manual'),
+        followUpDirection: initialData?.followUpDirection || defaultAIField('manual'),
       });
       if (initialData?.files) {
-        const newMap: Record<string, UploadFile[]> = { 定性: [], 定量: [], 大数据: [], 综合: [] };
+        const newMap: Record<string, UploadFile[]> = { 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] };
         initialData.files.forEach(f => {
           const cat = f.category || '综合';
           if (!newMap[cat]) newMap[cat] = [];
@@ -962,7 +987,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         });
         setFileListMap(newMap);
       } else {
-        setFileListMap({ 定性: [], 定量: [], 大数据: [], 综合: [] });
+        setFileListMap({ 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] });
       }
     }
   }, [open, initialData]);
@@ -1034,23 +1059,20 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         category: categoryVal,
         brand: brandVal,
         researchType: values.researchType,
-        projectType: projectTypeVal.length > 0 ? projectTypeVal : undefined,
         executionType: selectedExecutionTypes,
         qualFields: Object.keys(qualFieldsMap).length > 0
-          ? (qualFieldsMap as Partial<Record<'定性' | '定量', QualQtyFields>>)
+          ? (qualFieldsMap as Partial<Record<'定性' | '定量' | '体验测评', QualQtyFields>>)
           : undefined,
         bigDataFields: selectedExecutionTypes.includes('大数据') ? (bigDataFields as BigDataFields) : undefined,
         projectBackground: aiFields.projectBackground,
         projectPurpose: aiFields.projectPurpose,
         mainConclusion: aiFields.mainConclusion,
         followUpDirection: aiFields.followUpDirection,
-        files: [
-          ...allFiles.map(f => ({
-            uid: f.uid, name: f.name, url: f.url as string | undefined,
-            size: f.size, type: f.type, status: 'done' as const,
-            category: (f as { category?: string }).category || '综合',
-          })),
-        ],
+        files: allFiles.map(f => ({
+          uid: f.uid, name: f.name, url: f.url as string | undefined,
+          size: f.size, type: f.type, status: 'done' as const,
+          category: (f as { category?: string }).category || '综合',
+        })),
       };
       onSubmit(projectData);
       handleClose();
@@ -1065,18 +1087,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     setQualFieldsMap({});
     setBigDataFields({});
     setAudienceFileMap({});
-    setFileListMap({ 定性: [], 定量: [], 大数据: [], 综合: [] });
-    setProjectTypeVal([]);
+    setFileListMap({ 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] });
     setSalesRegionVal([]);
     setCategoryVal([]);
     setBrandVal([]);
     setSalesRegionError(false);
     setExecTypeError(false);
     setAiFields({
-      projectBackground: defaultAIField('ai'),
-      projectPurpose: defaultAIField('ai'),
-      mainConclusion: defaultAIField('ai'),
-      followUpDirection: defaultAIField('ai'),
+      projectBackground: defaultAIField('manual'),
+      projectPurpose: defaultAIField('manual'),
+      mainConclusion: defaultAIField('manual'),
+      followUpDirection: defaultAIField('manual'),
     });
     onClose();
   };
@@ -1125,10 +1146,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         <Col span={12}>
           <Form.Item
             name="researchType"
-            label={<ReqLabel>研究类型</ReqLabel>}
-            rules={[{ required: true, message: '请选择研究类型' }]}
+            label={<ReqLabel>项目研究类型</ReqLabel>}
+            rules={[{ required: true, message: '请选择项目研究类型' }]}
           >
-            <Select placeholder="请选择研究类型">
+            <Select placeholder="请选择项目研究类型">
               {RESEARCH_TYPE_OPTIONS.map(opt => (
                 <Select.Option key={opt.value} value={opt.value}>
                   <Space>
@@ -1173,7 +1194,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       </Row>
 
       <Row gutter={24}>
-        <Col span={12}>
+        <Col span={24}>
           <Form.Item label="品牌">
             <CascadePanel
               groups={brandGroups}
@@ -1181,15 +1202,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               onChange={setBrandVal}
               placeholder="请选择品牌（可多选，选填）"
               flatMode
-            />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item label="项目类型">
-            <Checkbox.Group
-              options={PROJECT_TYPE_OPTIONS}
-              value={projectTypeVal}
-              onChange={v => setProjectTypeVal(v as string[])}
             />
           </Form.Item>
         </Col>
@@ -1237,8 +1249,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       {QUAL_TYPES.filter(t => selectedExecutionTypes.includes(t)).map(t => (
         <QualFieldsForm
           key={t}
-          execType={t as '定性' | '定量'}
-          value={qualFieldsMap[t as '定性' | '定量'] || {}}
+          execType={t as '定性' | '定量' | '体验测评'}
+          value={qualFieldsMap[t as '定性' | '定量' | '体验测评'] || {}}
           onChange={(val) => setQualFieldsMap(prev => ({ ...prev, [t]: val }))}
           audienceFile={audienceFileMap[t] || null}
           onAudienceFileChange={(file) => setAudienceFileMap(prev => ({ ...prev, [t]: file }))}
@@ -1263,8 +1275,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           onAdd={(f) => addFile(cat, f)}
           onRemove={(uid) => removeFile(cat, uid)}
           aiFiles={aiFiles.filter(af => af.execType === cat)}
-          usedAIFileIds={usedAIFileIds}
-          isBigData={cat === '大数据'}
         />
       ))}
 
@@ -1282,17 +1292,21 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     <div>
       <Alert
         type="info" showIcon icon={<RobotOutlined />}
-        message='默认「AI提炼」模式，提交后自动从文件中提炼内容。可切换为「手动填写」。'
+        message='默认「手动填写」模式。点击各字段右上角「AI提炼」可选择已上传文件，提交后 AI 自动提炼内容。'
         style={{ marginBottom: 16, borderRadius: 8 }}
       />
       <AIFieldInput label="项目背景" value={aiFields.projectBackground}
-        onChange={(v) => setAiFields(prev => ({ ...prev, projectBackground: v }))} />
+        onChange={(v) => setAiFields(prev => ({ ...prev, projectBackground: v }))}
+        availableFiles={allFiles} />
       <AIFieldInput label="项目目的" value={aiFields.projectPurpose}
-        onChange={(v) => setAiFields(prev => ({ ...prev, projectPurpose: v }))} />
+        onChange={(v) => setAiFields(prev => ({ ...prev, projectPurpose: v }))}
+        availableFiles={allFiles} />
       <AIFieldInput label="主要结论/价值提炼" value={aiFields.mainConclusion}
-        onChange={(v) => setAiFields(prev => ({ ...prev, mainConclusion: v }))} />
+        onChange={(v) => setAiFields(prev => ({ ...prev, mainConclusion: v }))}
+        availableFiles={allFiles} />
       <AIFieldInput label="后续工作方向" value={aiFields.followUpDirection}
-        onChange={(v) => setAiFields(prev => ({ ...prev, followUpDirection: v }))} />
+        onChange={(v) => setAiFields(prev => ({ ...prev, followUpDirection: v }))}
+        availableFiles={allFiles} />
     </div>
   );
 
