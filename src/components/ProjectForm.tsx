@@ -1239,11 +1239,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         {execTypeError && (
           <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>请至少选择一种执行类型</div>
         )}
-        {selectedExecutionTypes.length > 0 && (
-          <Space size={4} wrap style={{ marginTop: 8 }}>
-            {selectedExecutionTypes.map(t => <Tag key={t} color="blue">{t}</Tag>)}
-          </Space>
-        )}
       </Form.Item>
 
       {QUAL_TYPES.filter(t => selectedExecutionTypes.includes(t)).map(t => (

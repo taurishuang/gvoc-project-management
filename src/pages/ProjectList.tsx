@@ -36,14 +36,12 @@ import type { AIInterviewFileRef } from '../types/project';
 import { RESEARCH_TYPE_OPTIONS, BUSINESS_UNIT_OPTIONS, BUSINESS_UNIT_CATEGORY_MAP, generateProjectNo } from '../types/project';
 import ProjectForm from '../components/ProjectForm';
 import ProjectDetail from '../components/ProjectDetail';
-import AIAgentDrawer from '../components/AIAgentDrawer';
 
 interface ProjectListProps {
   onNavigateInterview?: () => void;
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   aiFiles?: AIInterviewFileRef[];
-  usedAIFileIds?: Set<string>;
 }
 
 const { Text } = Typography;
@@ -182,7 +180,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
   projects,
   setProjects,
   aiFiles = [],
-  usedAIFileIds = new Set(),
 }) => {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -194,7 +191,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const [filterCategory, setFilterCategory] = useState<string | undefined>();
   const [filterResearch, setFilterResearch] = useState<string | undefined>();
   const [filterExecution, setFilterExecution] = useState<string | undefined>();
-  const [agentOpen, setAgentOpen] = useState(false);
 
   // 统计标签选中态（null = 全部）
   const [activeStatKey, setActiveStatKey] = useState<string | null>(null);
@@ -761,7 +757,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
         mode={formMode}
         initialData={editingProject ?? undefined}
         aiFiles={aiFiles}
-        usedAIFileIds={usedAIFileIds}
         onClose={() => {
           setFormOpen(false);
           setEditingProject(null);
@@ -777,45 +772,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
           setDetailOpen(false);
           setSelectedProject(null);
         }}
-      />
-
-      {/* ── 悬浮 AI 按钮 ── */}
-      <div
-        onClick={() => setAgentOpen(true)}
-        title="GVOC 用研 AI 助手"
-        style={{
-          position: 'fixed',
-          right: 32,
-          bottom: 40,
-          width: 56,
-          height: 56,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1677ff 0%, #722ed1 100%)',
-          boxShadow: '0 4px 20px rgba(22,119,255,0.45)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 999,
-          transition: 'transform 0.2s, box-shadow 0.2s',
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.1)';
-          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 28px rgba(22,119,255,0.55)';
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
-          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(22,119,255,0.45)';
-        }}
-      >
-        <RobotOutlined style={{ fontSize: 24, color: '#fff' }} />
-      </div>
-
-      {/* ── AI Agent 对话抽屉 ── */}
-      <AIAgentDrawer
-        open={agentOpen}
-        onClose={() => setAgentOpen(false)}
-        projects={projects}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { ConfigProvider } from 'antd';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import ProjectList from './pages/ProjectList';
 import AIInterviewPage from './pages/AIInterviewPage';
 import { mockProjects } from './data/mockData';
@@ -86,17 +86,6 @@ function App() {
     }
   };
 
-  // 计算已被用研体验项目关联的 AI文件 id 集合（uid 格式为 'ai_' + aiFileId）
-  const usedAIFileIds = useMemo<Set<string>>(() => {
-    const used = new Set<string>();
-    projects.forEach(p => {
-      p.files?.forEach(f => {
-        if (f.uid.startsWith('ai_')) used.add(f.uid.slice(3));
-      });
-    });
-    return used;
-  }, [projects]);
-
   return (
     <ConfigProvider
       theme={{
@@ -116,7 +105,6 @@ function App() {
           projects={projects}
           setProjects={setProjects}
           aiFiles={aiFiles}
-          usedAIFileIds={usedAIFileIds}
           onNavigateInterview={() => setPage('interview')}
         />
       ) : (

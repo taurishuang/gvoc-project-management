@@ -168,12 +168,11 @@ export interface Project {
   businessUnit: string;           // 所属事业部
   category: string[];             // 所属品类（多选）
   brand: string[];                // 品牌（多选，选填）
-  researchType: ResearchType;     // 研究类型（必填）
-  projectType?: string[];         // 项目类型（选填，多选）
+  researchType: ResearchType;     // 项目研究类型
   executionType: ExecutionType[]; // 项目执行类型（多选）
 
   // 执行类型详细字段（每个执行类型独立一份，key为执行类型名）
-  qualFields?: Partial<Record<'定性' | '定量', QualQtyFields>>;
+  qualFields?: Partial<Record<'定性' | '定量' | '体验测评', QualQtyFields>>;
   bigDataFields?: BigDataFields;
 
   // 项目背景信息（支持AI提炼）
@@ -218,17 +217,12 @@ export const SALES_REGION_OPTIONS = REGION_TREE.flatMap(g =>
   g.countries.map(c => ({ label: c.label, value: c.value, group: g.label }))
 );
 
-// 执行类型选项（移除体验测评）
+// 执行类型选项
 export const EXECUTION_TYPE_OPTIONS: { label: string; value: ExecutionType }[] = [
   { label: '定性', value: '定性' },
   { label: '定量', value: '定量' },
+  { label: '体验测评', value: '体验测评' },
   { label: '大数据', value: '大数据' },
-];
-
-// 项目类型选项（非必填，多选）
-export const PROJECT_TYPE_OPTIONS = [
-  { label: '研究类项目', value: '研究类项目' },
-  { label: '体验类项目', value: '体验类项目' },
 ];
 
 // 研究类型选项

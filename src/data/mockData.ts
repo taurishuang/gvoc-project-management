@@ -104,9 +104,9 @@ export const mockProjects: Project[] = [
     category: ['滚筒洗衣机'],
     brand: ['Little Swan（小天鹅）'],
     researchType: '开发过程中的测评',
-    executionType: ['定性'],
+    executionType: ['体验测评'],
     qualFields: {
-      定性: {
+      体验测评: {
         executionMethod: '中心位测试（CLT）+ 深度访谈',
         sampleSize: '60人',
         sampleDistribution: '上海30人，广州30人',
@@ -131,7 +131,7 @@ export const mockProjects: Project[] = [
       value: '需针对操控界面进行二轮优化设计后再次测试，蒸汽功能可作为主要传播诉求',
     },
     files: [
-      { uid: 'f5', name: '概念测试报告.pptx', type: 'application/vnd.ms-powerpoint', status: 'done', category: '定性' },
+      { uid: 'f5', name: '概念测试报告.pptx', type: 'application/vnd.ms-powerpoint', status: 'done', category: '体验测评' },
       { uid: 'f6', name: '测评现场照片.zip', type: 'application/zip', status: 'done', category: '综合' },
     ],
     createdAt: '2023-08-20T10:00:00Z',

@@ -123,7 +123,7 @@ const AIFieldValue: React.FC<{ label: string; field?: AIField }> = ({ label, fie
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, open, onClose }) => {
   if (!project) return null;
 
-  const qualTypes = (['定性', '定量'] as const).filter(t =>
+  const qualTypes = (['定性', '定量', '体验测评'] as const).filter(t =>
     project.executionType.includes(t)
   );
   const hasBigData = project.executionType.includes('大数据');
