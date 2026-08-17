@@ -949,11 +949,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [bigDataFields, setBigDataFields] = useState<Partial<BigDataFields>>(initialData?.bigDataFields || {});
   const [audienceFileMap, setAudienceFileMap] = useState<Record<string, UploadFile | null>>({});
   const [fileListMap, setFileListMap] = useState<Record<string, UploadFile[]>>({ 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] });
-  const [aiFields, setAiFields] = useState({
-    projectBackground: initialData?.projectBackground || defaultAIField('manual'),
-    projectPurpose: initialData?.projectPurpose || defaultAIField('manual'),
-    mainConclusion: initialData?.mainConclusion || defaultAIField('manual'),
-    followUpDirection: initialData?.followUpDirection || defaultAIField('manual'),
+  const [bgFields, setBgFields] = useState({
+    projectBackground: initialData?.projectBackground?.value || '',
+    projectPurpose: initialData?.projectPurpose?.value || '',
+    mainConclusion: initialData?.mainConclusion?.value || '',
+    followUpDirection: initialData?.followUpDirection?.value || '',
   });
   const [salesRegionVal, setSalesRegionVal] = useState<string[]>(initialData?.salesRegion || []);
   const [categoryVal, setCategoryVal] = useState<string[]>(initialData?.category || []);
@@ -972,11 +972,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setBigDataFields(initialData?.bigDataFields || {});
       setSalesRegionError(false);
       setExecTypeError(false);
-      setAiFields({
-        projectBackground: initialData?.projectBackground || defaultAIField('manual'),
-        projectPurpose: initialData?.projectPurpose || defaultAIField('manual'),
-        mainConclusion: initialData?.mainConclusion || defaultAIField('manual'),
-        followUpDirection: initialData?.followUpDirection || defaultAIField('manual'),
+      setBgFields({
+        projectBackground: initialData?.projectBackground?.value || '',
+        projectPurpose: initialData?.projectPurpose?.value || '',
+        mainConclusion: initialData?.mainConclusion?.value || '',
+        followUpDirection: initialData?.followUpDirection?.value || '',
       });
       if (initialData?.files) {
         const newMap: Record<string, UploadFile[]> = { 定性: [], 定量: [], 体验测评: [], 大数据: [], 综合: [] };
@@ -1064,10 +1064,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           ? (qualFieldsMap as Partial<Record<'定性' | '定量' | '体验测评', QualQtyFields>>)
           : undefined,
         bigDataFields: selectedExecutionTypes.includes('大数据') ? (bigDataFields as BigDataFields) : undefined,
-        projectBackground: aiFields.projectBackground,
-        projectPurpose: aiFields.projectPurpose,
-        mainConclusion: aiFields.mainConclusion,
-        followUpDirection: aiFields.followUpDirection,
+        projectBackground: { mode: 'manual' as const, value: bgFields.projectBackground },
+        projectPurpose: { mode: 'manual' as const, value: bgFields.projectPurpose },
+        mainConclusion: { mode: 'manual' as const, value: bgFields.mainConclusion },
+        followUpDirection: { mode: 'manual' as const, value: bgFields.followUpDirection },
         files: allFiles.map(f => ({
           uid: f.uid, name: f.name, url: f.url as string | undefined,
           size: f.size, type: f.type, status: 'done' as const,
@@ -1093,11 +1093,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     setBrandVal([]);
     setSalesRegionError(false);
     setExecTypeError(false);
-    setAiFields({
-      projectBackground: defaultAIField('manual'),
-      projectPurpose: defaultAIField('manual'),
-      mainConclusion: defaultAIField('manual'),
-      followUpDirection: defaultAIField('manual'),
+    setBgFields({
+      projectBackground: '',
+      projectPurpose: '',
+      mainConclusion: '',
+      followUpDirection: '',
     });
     onClose();
   };
@@ -1285,23 +1285,25 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   // ─── Step 3 ───────────────────────────────────────────────────────
   const Step3 = (
     <div>
-      <Alert
-        type="info" showIcon icon={<RobotOutlined />}
-        message='默认「手动填写」模式。点击各字段右上角「AI提炼」可选择已上传文件，提交后 AI 自动提炼内容。'
-        style={{ marginBottom: 16, borderRadius: 8 }}
-      />
-      <AIFieldInput label="项目背景" value={aiFields.projectBackground}
-        onChange={(v) => setAiFields(prev => ({ ...prev, projectBackground: v }))}
-        availableFiles={allFiles} />
-      <AIFieldInput label="项目目的" value={aiFields.projectPurpose}
-        onChange={(v) => setAiFields(prev => ({ ...prev, projectPurpose: v }))}
-        availableFiles={allFiles} />
-      <AIFieldInput label="主要结论/价值提炼" value={aiFields.mainConclusion}
-        onChange={(v) => setAiFields(prev => ({ ...prev, mainConclusion: v }))}
-        availableFiles={allFiles} />
-      <AIFieldInput label="后续工作方向" value={aiFields.followUpDirection}
-        onChange={(v) => setAiFields(prev => ({ ...prev, followUpDirection: v }))}
-        availableFiles={allFiles} />
+      {(['projectBackground', 'projectPurpose', 'mainConclusion', 'followUpDirection'] as const).map((key) => {
+        const labelMap = {
+          projectBackground: '项目背景',
+          projectPurpose: '项目目的',
+          mainConclusion: '主要结论/价值提炼',
+          followUpDirection: '后续工作方向',
+        };
+        return (
+          <div key={key} style={{ marginBottom: 16, background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px' }}>
+            <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>{labelMap[key]}</Text>
+            <TextArea
+              rows={3} maxLength={500} showCount
+              placeholder={`请填写${labelMap[key]}...`}
+              value={bgFields[key]}
+              onChange={(e) => setBgFields(prev => ({ ...prev, [key]: e.target.value }))}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 
